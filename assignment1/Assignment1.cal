@@ -1,0 +1,271 @@
+/*******************************
+ ***** SECTION 1 - OPTIONS *****
+ *******************************/
+
+options {
+  IGNORE_CASE = true;
+}
+
+/*********************************
+ ***** SECTION 2 - USER CODE *****
+ *********************************/
+
+PARSER_BEGIN(Assignment1)
+
+public class Assignment1 {
+  	public static void main(String args[]) {
+  	
+	  	Assignment1 parser;
+
+	  	if ( args.length == 0 ) {
+
+	       System.out.println("Reading from standard input...");
+	       parser = new Assignment1(System.in);
+
+	    } else if (args.length == 1) { 
+	    	try {
+
+	    		parser = new Assignment1(new java.io.FileInputStream(args[0]));
+
+	    	} catch (java.io.FileNotFoundException e) {
+
+	    		System.err.println("File " + args[0] + " not found.");
+	            return;
+
+	    	}
+	    } else {
+
+			System.out.println("Incorrect command entered. Assignment1 can be used with the following commands:");
+	        System.out.println("    java Assignment1 < file");
+	        System.out.println("    java Assignment1 file");
+	        return;  
+
+	    }
+
+	    try {
+	        parser.Program();
+	        System.out.println("Program parsed successfully.");
+
+	    } catch (ParseException e) {
+	        System.out.println(e.getMessage());
+	        System.out.println("Encountered errors while parsing.");
+	    }
+
+  	}
+
+}
+
+PARSER_END(Assignment1)
+
+/*****************************************
+ ***** SECTION 3 - TOKEN DEFINITIONS *****
+ *****************************************/
+
+TOKEN_MGR_DECLS :
+{
+	static int commentNesting = 0;
+}
+
+//Skip whitespace and newlines
+SKIP : { 
+	"\n" 
+	| "\r" 
+	| "\r\n" 
+	| " "
+	| "\f"
+	| "\t"
+}
+
+SKIP : /* COMMENTS */
+{
+	"/*" { commentNesting++; } : IN_COMMENT
+	|	< "//" ([" "-"~"])* ("\n" | "\r" | "\r\n") >
+}
+
+<IN_COMMENT> SKIP :
+{
+	"/*" { commentNesting++; }
+	| "*/" { commentNesting--;
+		if (commentNesting == 0)
+			SwitchTo(DEFAULT);
+	}
+	| <~[]>
+}
+
+//RESERVED WORDS
+TOKEN : {
+	<VARIABLE: "variable">
+	|  <CONSTANT: "constant">
+	|  <RETURN: "return">
+	|  <INTEGER: "integer">
+	|  <BOOLEAN: "boolean">
+	|  <VOID: "void">
+	|  <MAIN: "main">
+	|  <TRUE: "true">
+	|  <FALSE: "false">
+	|  <WHILE: "while">
+	|  <BEGIN: "begin">
+	|  <IF: "if">
+	|  <END: "end">
+	|  <ELSE: "else">
+	|  <IS: "is">
+	|  <SKIPTEXT: "skip">
+}
+
+//IDENTIFIER TOKEN
+TOKEN : {
+ 	<IDENTIFIER: <LETTER>(<LETTER>|<DIGIT>|<UNDERSCORE>)*>
+	|  <#LETTER: (["a"-"z","A"-"Z"])>
+	|  <#UNDERSCORE: (["_"])>
+	|  <#DIGIT: ["0"-"9"]>
+}
+
+//NUMBER TOKEN
+TOKEN : { 
+	< NUMBER : "0" | (<MINUS>)? ["1"-"9"] ((<DIGIT>)*) > 
+}
+
+//OPERATOR & SYMBOL TOKENS
+TOKEN : { 
+	< PLUS : "+" >  
+	|	< MINUS : "-" > 
+	|	< COMMA : "," > 
+	|	< SEMICOLON : ";" > 
+	|	< COLON : ":" > 
+	|	< COLONEQUALS : ":=" > 
+	|	< LEFTBRACKET : "(" > 
+	|	< RIGHTBRACKET : ")" > 
+	|	< NOT : "~" > 
+	|	< OR : "|" >
+	|	< AND : "&" > 
+	|	< EQUAL : "=" >
+	|	< NOTEQUAL : "!=" >
+	|	< LT : "<" > 
+	|	< GT : ">" > 
+	|	< LET : "<=" >
+	|	< GET : ">=" >
+}
+
+
+/***********************************
+ ***** SECTION 4 - THE GRAMMAR *****
+ ***********************************/
+
+void Program() : {}
+{
+    (Decl())* (Function())* Main()
+}
+
+void Decl() : {}
+{
+	(VarDecl() | ConstantDecl()) <SEMICOLON>
+}
+
+void VarDecl() : {}
+{
+	<VARIABLE> <IDENTIFIER> <COLON> Type()
+}
+
+void ConstantDecl() : {} 
+{
+	<CONSTANT> <IDENTIFIER> <COLON> Type() <COLONEQUALS> Expression()
+}
+
+void Function() : {} 
+{
+	Type() <IDENTIFIER> <LEFTBRACKET> ParameterList() <RIGHTBRACKET> <IS> 
+	(Decl())*
+	<BEGIN>
+	(Statement())*
+	<RETURN> <LEFTBRACKET> [Expression()] <RIGHTBRACKET> <SEMICOLON>
+	<END>
+}
+
+void Type() : {}
+{
+	<INTEGER> | <BOOLEAN> | <VOID>
+}
+
+void ParameterList() : {} 
+{
+	[NempParameterList()]
+}
+
+void NempParameterList() : {}
+{
+	<IDENTIFIER> <COLON> Type() [<COMMA> NempParameterList()]
+}
+
+void Main() : {}
+{
+	<MAIN>
+	<BEGIN>
+	(Decl())*
+	(Statement())*
+	<END>
+}
+
+void Statement() : {}
+{
+	<IDENTIFIER> (<COLONEQUALS> Expression() <SEMICOLON> | <LEFTBRACKET> ArgList() <RIGHTBRACKET> <SEMICOLON>)
+	|	<BEGIN> (Statement())* <END>
+	|	<IF> Condition() <BEGIN> (Statement())* <END> <ELSE> <BEGIN> (Statement())* <END>
+	|	<WHILE> Condition() <BEGIN> (Statement())* <END>
+	|	<SKIPTEXT> <SEMICOLON>
+}
+
+void Expression() : {} 
+{
+	(Fragment() Expression1())
+	|	<LEFTBRACKET> Expression() <RIGHTBRACKET> Expression1()
+}
+
+void Expression1() : {}
+{
+	[BinaryArithOp() Expression()]
+}
+
+void BinaryArithOp() : {}
+{
+	<PLUS>
+	|	<MINUS>
+}
+
+void Fragment(): {}
+{
+	[<MINUS>] <IDENTIFIER> [<LEFTBRACKET> ArgList() <RIGHTBRACKET>]
+	|	<NUMBER>
+	|	<TRUE>
+	|	<FALSE>
+}
+
+void Condition(): {}
+{
+	[<NOT>] (<LEFTBRACKET> Condition() <RIGHTBRACKET> Condition1()
+	| Fragment() [CompOp()] Condition1())
+}
+
+void Condition1() : {}
+{
+	[(<OR> | <AND>) Condition()]
+}
+
+void CompOp(): {}
+{
+	(<EQUAL>
+	|	<NOTEQUAL> 
+	|	<LT> 
+	|	<GT> 
+	|	<LET> 
+	|	<GET>) Expression()
+}
+
+void ArgList(): {} 
+{
+	[NempArgList()]
+}
+
+void NempArgList(): {}
+{
+	<IDENTIFIER> [<COMMA> NempArgList()]
+} 
